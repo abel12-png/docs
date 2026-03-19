@@ -1,0 +1,425 @@
+---
+title: 'MIMIC-IV Dataset Setup'
+description: 'Guide to accessing, downloading, and preprocessing MIMIC-IV for T2DM risk prediction'
+---
+
+## About MIMIC-IV
+
+[MIMIC-IV](https://physionet.org/content/mimiciv/) (Medical Information Mart for Intensive Care IV) is a large, freely-available database comprising deidentified health-related data from patients admitted to critical care units at the Beth Israel Deaconess Medical Center.
+
+<Info>
+  **Dataset Statistics:**
+  - **Patients**: 50,048
+  - **Admissions**: 73,181  
+  - **Time Period**: 2008-2019
+  - **Data Points**: Laboratory values, medications, procedures, diagnoses, vitals
+  - **Size**: ~27 GB (compressed)
+</Info>
+
+## Prerequisites
+
+### 1. PhysioNet Credentialing
+
+<Steps>
+  <Step title="Create PhysioNet Account">
+    Register at [physionet.org](https://physionet.org/register/)
+  </Step>
+  
+  <Step title="Complete CITI Training">
+    Complete the required CITI "Data or Specimens Only Research" course
+    - [Get CITI Training](https://physionet.org/about/citi-course/)
+    - Upload completion certificate
+  </Step>
+  
+  <Step title="Sign Data Use Agreement">
+    Sign the PhysioNet Credentialed Health Data License Agreement  
+    - Review terms carefully
+    - Commit to responsible data use
+  </Step>
+  
+  <Step title="Request Access">
+    Request access to MIMIC-IV dataset
+    - Approval typically takes 1-3 business days
+  </Step>
+</Steps>
+
+<Warning>
+  MIMIC-IV contains protected health information. You must:
+  - Never attempt to re-identify patients
+  - Keep data secure and encrypted
+  - Not share credentials or data
+  - Follow all ethical guidelines
+</Warning>
+
+## Download MIMIC-IV
+
+### Option 1: Using wget (Recommended)
+
+```bash
+# Set credentials
+export PHYSIONET_USERNAME="your_username"
+export PHYSIONET_PASSWORD="your_password"
+
+# Download core modules
+wget --user $PHYSIONET_USERNAME \
+     --password $PHYSIONET_PASSWORD \
+     -r -N -c -np -nH \
+     --cut-dirs=3 \
+     --reject "index.html*" \
+     https://physionet.org/files/mimiciv/2.2/
+
+# Expected directory structure:
+# mimiciv/2.2/
+# ├── core/
+# ├── hosp/
+# └── icu/
+```
+
+### Option 2: Using Python Script
+
+```python download_mimic.py
+import os
+import subprocess
+from pathlib import Path
+
+class MIMICDownloader:
+    def __init__(self, username, password, output_dir="data/mimic-iv"):
+        self.username = username
+        self.password = password
+        self.output_dir = Path(output_dir)
+        self.base_url = "https://physionet.org/files/mimiciv/2.2/"
+    
+    def download_module(self, module_name):
+        """Download specific MIMIC-IV module"""
+        print(f"Downloading {module_name} module...")
+        
+        cmd = [
+            "wget",
+            "--user", self.username,
+            "--password", self.password,
+            "-r", "-N", "-c", "-np", "-nH",
+            "--cut-dirs=3",
+            "--reject", "index.html*",
+            f"{self.base_url}{module_name}/"
+        ]
+        
+        subprocess.run(cmd, cwd=self.output_dir, check=True)
+        print(f"{module_name} module downloaded successfully")
+    
+    def download_all(self):
+        """Download all MIMIC-IV modules"""
+        modules = ["core", "hosp", "icu"]
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        for module in modules:
+            self.download_module(module)
+
+if __name__ == "__main__":
+    username = os.getenv("PHYSIONET_USERNAME")
+    password = os.getenv("PHYSIONET_PASSWORD")
+    
+    downloader = MIMICDownloader(username, password)
+    downloader.download_all()
+```
+
+### Option 3: Direct Download via Browser
+
+For smaller datasets or troubleshooting:
+1. Navigate to [MIMIC-IV Files](https://physionet.org/content/mimiciv/2.2/)
+2. Click "Download ZIP" button
+3. Extract to your data directory
+
+## Database Setup
+
+### Load into PostgreSQL
+
+```bash
+# Create database
+createdb mimic4
+
+# Load schema
+psql -d mimic4 -f schema/postgres_create_tables.sql
+
+# Import data
+cd mimic-iv/2.2/core
+for file in *.csv.gz; do
+    table=$(basename $file .csv.gz)
+    echo "Loading $table..."
+    gunzip -c $file | psql -d mimic4 -c "\COPY mimic_core.$table FROM STDIN WITH CSV HEADER"
+done
+```
+
+<CodeGroup>
+```sql schema/postgres_create_tables.sql
+-- Create schemas
+CREATE SCHEMA IF NOT EXISTS mimic_core;
+CREATE SCHEMA IF NOT EXISTS mimic_hosp;
+CREATE SCHEMA IF NOT EXISTS mimic_icu;
+
+-- Core tables
+CREATE TABLE mimic_core.patients (
+    subject_id INTEGER PRIMARY KEY,
+    gender VARCHAR(1) NOT NULL,
+    anchor_age INTEGER NOT NULL,
+    anchor_year INTEGER NOT NULL,
+    anchor_year_group VARCHAR(20) NOT NULL,
+    dod DATE
+);
+
+CREATE TABLE mimic_core.admissions (
+    subject_id INTEGER NOT NULL,
+    hadm_id INTEGER PRIMARY KEY,
+    admittime TIMESTAMP NOT NULL,
+    dischtime TIMESTAMP NOT NULL,
+    deathtime TIMESTAMP,
+    admission_type VARCHAR(50),
+    admission_location VARCHAR(50),
+    discharge_location VARCHAR(50),
+    insurance VARCHAR(50),
+    language VARCHAR(10),
+    marital_status VARCHAR(50),
+    race VARCHAR(50),
+    hospital_expire_flag SMALLINT,
+    FOREIGN KEY (subject_id) REFERENCES mimic_core.patients(subject_id)
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_admissions_subject ON mimic_core.admissions(subject_id);
+CREATE INDEX idx_admissions_time ON mimic_core.admissions(admittime, dischtime);
+```
+
+```python Alternative: Load with Pandas
+import pandas as pd
+import sqlalchemy
+
+# Create engine
+engine = sqlalchemy.create_engine('postgresql://user:pass@localhost/mimic4')
+
+# Load CSVs
+def load_table(module, table_name):
+    filepath = f"mimic-iv/2.2/{module}/{table_name}.csv.gz"
+    df = pd.read_csv(filepath, compression='gzip')
+    df.to_sql(
+        table_name,
+        engine,
+        schema=f"mimic_{module}",
+        if_exists='replace',
+        index=False,
+        chunksize=10000
+    )
+    print(f"Loaded {table_name}: {len(df)} rows")
+
+# Load core tables
+for table in ['patients', 'admissions', 'transfers']:
+    load_table('core', table)
+
+# Load hospital tables
+for table in ['diagnoses_icd', 'labevents', 'prescriptions']:
+    load_table('hosp', table)
+```
+</CodeGroup>
+
+## Extract T2DM Cohort
+
+### Define Inclusion Criteria
+
+```python extract_t2dm_cohort.py
+import pandas as pd
+import sqlalchemy as sa
+
+# ICD-10 codes for Type 2 Diabetes
+T2DM_ICD10_CODES = [
+    'E11',     # Type 2 diabetes mellitus
+    'E11.0',   # T2DM with hyperosmolarity
+    'E11.1',   # T2DM with ketoacidosis
+    'E11.2',   # T2DM with kidney complications
+    'E11.3',   # T2DM with ophthalmic complications
+    'E11.4',   # T2DM with neurological complications
+    'E11.5',   # T2DM with circulatory complications
+    'E11.6',   # T2DM with other specified complications
+    'E11.8',   # T2DM with unspecified complications
+    'E11.9',   # T2DM without complications
+]
+
+class T2DMCohortExtractor:
+    def __init__(self, db_connection):
+        self.conn = db_connection
+    
+    def extract_cohort(self):
+        """Extract patients with T2DM diagnosis"""
+        
+        query = """
+        WITH t2dm_patients AS (
+            SELECT DISTINCT
+                d.subject_id,
+                d.hadm_id,
+                d.icd_code,
+                d.icd_version,
+                a.admittime,
+                a.dischtime,
+                p.gender,
+                p.anchor_age,
+                p.dod
+            FROM mimic_hosp.diagnoses_icd d
+            INNER JOIN mimic_core.admissions a 
+                ON d.hadm_id = a.hadm_id
+            INNER JOIN mimic_core.patients p 
+                ON d.subject_id = p.subject_id
+            WHERE d.icd_version = 10
+                AND d.icd_code LIKE 'E11%'
+        ),
+        control_patients AS (
+            SELECT DISTINCT
+                p.subject_id,
+                p.gender,
+                p.anchor_age,
+                p.dod
+            FROM mimic_core.patients p
+            WHERE p.subject_id NOT IN (
+                SELECT subject_id FROM t2dm_patients
+            )
+            AND p.anchor_age >= 18
+            LIMIT 10000  -- Match case/control ratio
+        )
+        SELECT 't2dm' as cohort, * FROM t2dm_patients
+        UNION ALL
+        SELECT 'control' as cohort, subject_id, NULL as hadm_id, 
+               NULL as icd_code, NULL as icd_version,
+               NULL as admittime, NULL as dischtime,
+               gender, anchor_age, dod
+        FROM control_patients
+        """
+        
+        cohort = pd.read_sql(query, self.conn)
+        return cohort
+    
+    def add_clinical_features(self, cohort):
+        """Add laboratory values and vitals"""
+        
+        # HbA1c values
+        hba1c_query = """
+        SELECT 
+            le.subject_id,
+            le.hadm_id,
+            le.charttime,
+            le.valuenum as hba1c
+        FROM mimic_hosp.labevents le
+        WHERE le.itemid IN (50852, 51222)  -- HbA1c LOINC codes
+            AND le.valuenum IS NOT NULL
+            AND le.valuenum BETWEEN 3 AND 20
+        """
+        hba1c = pd.read_sql(hba1c_query, self.conn)
+        
+        # Glucose values
+        glucose_query = """
+        SELECT 
+            le.subject_id,
+            le.hadm_id,
+            le.charttime,
+            le.valuenum as glucose
+        FROM mimic_hosp.labevents le
+        WHERE le.itemid IN (50809, 50931)  -- Glucose
+            AND le.valuenum IS NOT NULL
+            AND le.valuenum BETWEEN 50 AND 500
+        """
+        glucose = pd.read_sql(glucose_query, self.conn)
+        
+        # Merge with cohort
+        cohort = cohort.merge(
+            hba1c.groupby('subject_id')['hba1c'].mean().reset_index(),
+            on='subject_id',
+            how='left'
+        )
+        cohort = cohort.merge(
+            glucose.groupby('subject_id')['glucose'].mean().reset_index(),
+            on='subject_id',
+            how='left'
+        )
+        
+        return cohort
+
+if __name__ == "__main__":
+    # Connect to database
+    engine = sa.create_engine('postgresql://user:pass@localhost/mimic4')
+    
+    # Extract cohort
+    extractor = T2DMCohortExtractor(engine)
+    cohort = extractor.extract_cohort()
+    cohort = extractor.add_clinical_features(cohort)
+    
+    # Save
+    cohort.to_csv('data/processed/t2dm_cohort.csv', index=False)
+    print(f"Extracted {len(cohort)} patients")
+    print(f"T2DM cases: {(cohort['cohort'] == 't2dm').sum()}")
+    print(f"Controls: {(cohort['cohort'] == 'control').sum()}")
+```
+
+### Output Schema
+
+The extracted cohort includes:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `subject_id` | int | Unique patient identifier |
+| `hadm_id` | int | Hospital admission ID |
+| `cohort` | str | 't2dm' or 'control' |
+| `gender` | str | M/F |
+| `anchor_age` | int | Age at first admission |
+| `icd_code` | str | ICD-10 diagnosis code |
+| `admittime` | datetime | Admission timestamp |
+| `dischtime` | datetime | Discharge timestamp |
+| `hba1c` | float | Mean HbA1c (%) |
+| `glucose` | float | Mean glucose (mg/dL) |
+
+## Data Preprocessing
+
+### Handle Missing Values
+
+```python
+from sklearn.impute import SimpleImputer, KNNImputer
+
+def preprocess_clinical_data(df):
+    """Comprehensive preprocessing pipeline"""
+    
+    # Separate numeric and categorical
+    numeric_cols = ['anchor_age', 'hba1c', 'glucose']
+    categorical_cols = ['gender', 'cohort']
+    
+    # Impute numeric features (KNN preserves correlations)
+    numeric_imputer = KNNImputer(n_neighbors=5)
+    df[numeric_cols] = numeric_imputer.fit_transform(df[numeric_cols])
+    
+    # Impute categorical (mode)
+    cat_imputer = SimpleImputer(strategy='most_frequent')
+    df[categorical_cols] = cat_imputer.fit_transform(df[categorical_cols])
+    
+    # Derive features
+    df['bmi_estimated'] = estimate_bmi_from_vitals(df)
+    df['age_group'] = pd.cut(df['anchor_age'], 
+                              bins=[0, 40, 60, 80, 120],
+                              labels=['<40', '40-60', '60-80', '80+'])
+    
+    # Normalize numeric features
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+    
+    return df
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Feature Engineering" icon="gears" href="/data/feature-engineering">
+    Learn advanced feature extraction techniques
+  </Card>
+  <Card title="MM-Food-100K Setup" icon="images" href="/data/mm-food-setup">
+    Set up the food image dataset
+  </Card>
+  <Card title="Train Risk Model" icon="brain" href="/models/clinical-risk-lstm">
+    Build and train the LSTM risk predictor
+  </Card>
+  <Card title="Data Quality" icon="shield-check" href="/data/preprocessing">
+    Ensure data quality and validation
+  </Card>
+</CardGroup>

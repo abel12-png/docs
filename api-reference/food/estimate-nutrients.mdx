@@ -1,0 +1,24 @@
+---
+title: 'Estimate Nutrients'
+api: 'POST /api/v1/food/estimate-nutrients'
+description: 'Get nutritional estimates for specified food and portion'
+---
+
+## Endpoint
+
+```
+POST https://api.t2dm-predictor.com/api/v1/food/estimate-nutrients
+```
+
+## Request Body
+
+```json
+{
+  "food_name": "Grilled Chicken Breast",
+  "portion_grams": 150
+}
+```
+
+## Response
+
+Returns detailed nutritional breakdown.

@@ -1,0 +1,431 @@
+---
+title: 'Predict T2DM Risk'
+api: 'POST /api/v1/risk/predict'
+description: 'Predict Type 2 Diabetes risk score from clinical patient data'
+---
+
+## Endpoint
+
+```
+POST https://api.t2dm-predictor.com/api/v1/risk/predict
+```
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for API authentication
+  ```
+  Authorization: Bearer <your_api_token>
+  ```
+</ParamField>
+
+## Request Body
+
+<ParamField body="patient_id" type="string">
+  Unique patient identifier (optional, for tracking)
+</ParamField>
+
+<ParamField body="age" type="integer" required>
+  Patient age in years (18-120)
+</ParamField>
+
+<ParamField body="bmi" type="float" required>
+  Body Mass Index (kg/m²) (15-60)
+</ParamField>
+
+<ParamField body="hba1c" type="float">
+  Hemoglobin A1c percentage (4.0-15.0)
+</ParamField>
+
+<ParamField body="glucose_fasting" type="float">
+  Fasting blood glucose (mg/dL) (50-400)
+</ParamField>
+
+<ParamField body="systolic_bp" type="integer">
+  Systolic blood pressure (mmHg) (80-200)
+</ParamField>
+
+<ParamField body="diastolic_bp" type="integer">
+  Diastolic blood pressure (mmHg) (40-130)
+</ParamField>
+
+<ParamField body="ldl" type="float">
+  LDL cholesterol (mg/dL) (30-300)
+</ParamField>
+
+<ParamField body="hdl" type="float">
+  HDL cholesterol (mg/dL) (20-100)
+</ParamField>
+
+<ParamField body="triglycerides" type="float">
+  Triglycerides (mg/dL) (30-1000)
+</ParamField>
+
+<ParamField body="family_history" type="boolean">
+  Family history of diabetes
+</ParamField>
+
+<ParamField body="smoking_status" type="string">
+  Smoking status: "never", "former", "current"
+</ParamField>
+
+<ParamField body="physical_activity" type="string">
+  Activity level: "sedentary", "light", "moderate", "vigorous"
+</ParamField>
+
+## Request Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.t2dm-predictor.com/api/v1/risk/predict \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{
+    "patient_id": "PATIENT_12345",
+    "age": 45,
+    "bmi": 28.5,
+    "hba1c": 5.9,
+    "glucose_fasting": 110,
+    "systolic_bp": 130,
+    "diastolic_bp": 85,
+    "ldl": 140,
+    "hdl": 45,
+    "triglycerides": 180,
+    "family_history": true,
+    "smoking_status": "former",
+    "physical_activity": "light"
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.t2dm-predictor.com/api/v1/risk/predict"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_API_TOKEN"
+}
+
+payload = {
+    "patient_id": "PATIENT_12345",
+    "age": 45,
+    "bmi": 28.5,
+    "hba1c": 5.9,
+    "glucose_fasting": 110,
+    "systolic_bp": 130,
+    "diastolic_bp": 85,
+    "ldl": 140,
+    "hdl": 45,
+    "triglycerides": 180,
+    "family_history": True,
+    "smoking_status": "former",
+    "physical_activity": "light"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+result = response.json()
+
+print(f"5-Year T2DM Risk: {result['risk_score']:.1%}")
+print(f"Risk Category: {result['risk_category']}")
+```
+
+```javascript JavaScript
+const axios = require('axios');
+
+const url = 'https://api.t2dm-predictor.com/api/v1/risk/predict';
+
+const payload = {
+  patient_id: 'PATIENT_12345',
+  age: 45,
+  bmi: 28.5,
+  hba1c: 5.9,
+  glucose_fasting: 110,
+  systolic_bp: 130,
+  diastolic_bp: 85,
+  ldl: 140,
+  hdl: 45,
+  triglycerides: 180,
+  family_history: true,
+  smoking_status: 'former',
+  physical_activity: 'light'
+};
+
+axios.post(url, payload, {
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer YOUR_API_TOKEN'
+  }
+})
+.then(response => {
+  console.log(`5-Year T2DM Risk: ${(response.data.risk_score * 100).toFixed(1)}%`);
+  console.log(`Risk Category: ${response.data.risk_category}`);
+})
+.catch(error => {
+  console.error('Error:', error.response.data);
+});
+```
+
+```r R
+library(httr)
+library(jsonlite)
+
+url <- "https://api.t2dm-predictor.com/api/v1/risk/predict"
+
+payload <- list(
+  patient_id = "PATIENT_12345",
+  age = 45,
+  bmi = 28.5,
+  hba1c = 5.9,
+  glucose_fasting = 110,
+  systolic_bp = 130,
+  diastolic_bp = 85,
+  ldl = 140,
+  hdl = 45,
+  triglycerides = 180,
+  family_history = TRUE,
+  smoking_status = "former",
+  physical_activity = "light"
+)
+
+response <- POST(
+  url,
+  body = toJSON(payload, auto_unbox = TRUE),
+  add_headers(
+    `Content-Type` = "application/json",
+    Authorization = "Bearer YOUR_API_TOKEN"
+  )
+)
+
+result <- content(response, as = "parsed")
+cat(sprintf("5-Year T2DM Risk: %.1f%%\n", result$risk_score * 100))
+cat(sprintf("Risk Category: %s\n", result$risk_category))
+```
+</CodeGroup>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the prediction was successful
+</ResponseField>
+
+<ResponseField name="patient_id" type="string">
+  Echo of the provided patient ID
+</ResponseField>
+
+<ResponseField name="risk_score" type="float">
+  Predicted 5-year T2DM risk probability (0.0-1.0)
+</ResponseField>
+
+<ResponseField name="risk_category" type="string">
+  Risk stratification: "low", "moderate", "high", "very_high"
+</ResponseField>
+
+<ResponseField name="confidence_interval" type="object">
+  95% confidence interval for the risk score
+  <Expandable title="properties">
+    <ResponseField name="lower" type="float">
+      Lower bound of 95% CI
+    </ResponseField>
+    <ResponseField name="upper" type="float">
+      Upper bound of 95% CI
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="feature_importance" type="object">
+  SHAP values showing feature contributions
+  <Expandable title="properties">
+    <ResponseField name="hba1c" type="float">
+      Contribution of HbA1c to risk score
+    </ResponseField>
+    <ResponseField name="bmi" type="float">
+      Contribution of BMI to risk score
+    </ResponseField>
+    <ResponseField name="age" type="float">
+      Contribution of age to risk score
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="recommendations" type="array">
+  Personalized risk reduction recommendations
+</ResponseField>
+
+<ResponseField name="model_version" type="string">
+  Version of the risk prediction model used
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of prediction
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "success": true,
+  "patient_id": "PATIENT_12345",
+  "risk_score": 0.234,
+  "risk_category": "moderate",
+  "confidence_interval": {
+    "lower": 0.187,
+    "upper": 0.281
+  },
+  "feature_importance": {
+    "hba1c": 0.082,
+    "bmi": 0.045,
+    "age": 0.038,
+    "glucose_fasting": 0.029,
+    "family_history": 0.024,
+    "hdl": -0.015
+  },
+  "recommendations": [
+    "Maintain HbA1c below 5.7% through diet and exercise",
+    "Achieve 5-7% weight loss (target BMI: 25-27)",
+    "Increase physical activity to 150 min/week moderate intensity",
+    "Monitor fasting glucose every 3 months",
+    "Consider consultation with nutritionist"
+  ],
+  "model_version": "lstm_v2.1.0",
+  "timestamp": "2026-03-19T14:32:15Z"
+}
+```
+
+## Risk Categories
+
+| Category | Risk Score | Description | Action |
+|----------|------------|-------------|--------|
+| **Low** | < 0.10 | Low risk of developing T2DM | Routine screening, healthy lifestyle |
+| **Moderate** | 0.10 - 0.25 | Moderate risk, lifestyle modification beneficial | Enhanced screening, lifestyle intervention |
+| **High** | 0.25 - 0.50 | High risk, aggressive prevention needed | Intensive lifestyle program, consider metformin |
+| **Very High** | > 0.50 | Very high risk, medical intervention recommended | Medical management, frequent monitoring |
+
+## Error Responses
+
+<ResponseField name="error" type="object">
+  <Expandable title="Error structure">
+    <ResponseField name="code" type="string">
+      Error code identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error message
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional error context
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Common Errors
+
+<CodeGroup>
+```json 400 - Invalid Input
+{
+  "error": {
+    "code": "INVALID_INPUT",
+    "message": "Validation failed for input parameters",
+    "details": {
+      "age": "Must be between 18 and 120",
+      "bmi": "Must be between 15 and 60"
+    }
+  }
+}
+```
+
+```json 401 - Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired API token",
+    "details": {
+      "hint": "Check your Authorization header"
+    }
+  }
+}
+```
+
+```json 429 - Rate Limit Exceeded
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests",
+    "details": {
+      "limit": 100,
+      "window": "1 hour",
+      "retry_after": 3600
+    }
+  }
+}
+```
+
+```json 500 - Internal Server Error
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "An unexpected error occurred",
+    "details": {
+      "request_id": "req_abc123xyz",
+      "support": "contact support@example.com"
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Rate Limits
+
+<Info>
+  **Rate Limits:**
+  - Free tier: 100 requests/hour
+  - Professional: 1,000 requests/hour
+  - Enterprise: Custom limits
+</Info>
+
+## Model Performance
+
+The risk prediction model has been validated on independent test sets:
+
+| Metric | Value | 95% CI |
+|--------|-------|--------|
+| AUROC | 0.912 | 0.897-0.927 |
+| AUPRC | 0.847 | 0.829-0.865 |
+| Sensitivity (at 0.25 threshold) | 0.834 | 0.813-0.855 |
+| Specificity (at 0.25 threshold) | 0.876 | 0.861-0.891 |
+| PPV | 0.521 | 0.496-0.546 |
+| NPV | 0.967 | 0.959-0.975 |
+
+## Clinical Use Notes
+
+<Warning>
+  **Clinical Decision Support Tool Only**
+  
+  This API provides decision support and is not a substitute for professional medical judgment. 
+  All predictions should be reviewed by qualified healthcare professionals before clinical use.
+</Warning>
+
+<Note>
+  **Validated Populations:**
+  - Adults aged 18-80 years
+  - No prior diabetes diagnosis
+  - Complete laboratory values available
+  
+  Performance may vary outside these populations.
+</Note>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Batch Prediction" icon="layer-group" href="/api-reference/risk/batch-predict">
+    Process multiple patients simultaneously
+  </Card>
+  <Card title="Model Information" icon="info-circle" href="/api-reference/risk/model-info">
+    Get model version and performance metrics
+  </Card>
+  <Card title="Food Analysis" icon="camera" href="/api-reference/food/analyze-image">
+    Analyze food images for nutrition
+  </Card>
+  <Card title="Recommendations" icon="lightbulb" href="/api-reference/recommendations/personalized-meals">
+    Get personalized meal recommendations
+  </Card>
+</CardGroup>

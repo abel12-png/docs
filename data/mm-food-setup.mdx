@@ -1,0 +1,486 @@
+---
+title: 'MM-Food-100K Dataset Setup'
+description: 'Guide to accessing and preprocessing MM-Food-100K for food recognition and nutrient estimation'
+---
+
+## About MM-Food-100K
+
+MM-Food-100K is a comprehensive multimodal food dataset containing 100,000 images across 101 food categories with detailed nutritional annotations.
+
+<Info>
+  **Dataset Statistics:**
+  - **Images**: 100,000 high-resolution food images
+  - **Categories**: 101 diverse food classes
+  - **Annotations**: Nutritional content, portion sizes, ingredients
+  - **Modalities**: RGB images + text descriptions + metadata
+  - **Size**: ~45 GB
+</Info>
+
+## Dataset Structure
+
+```
+mm-food-100k/
+├── images/
+│   ├── train/
+│   │   ├── apple_pie/
+│   │   ├── baby_back_ribs/
+│   │   └── ... (101 categories)
+│   ├── val/
+│   └── test/
+├── annotations/
+│   ├── train_annotations.json
+│   ├── val_annotations.json
+│   └── test_annotations.json
+├── nutrition/
+│   ├── usda_nutrition_db.csv
+│   └── food_nutrient_mapping.json
+└── metadata.json
+```
+
+## Download Instructions
+
+<Warning>
+  The MM-Food-100K dataset may require registration and acceptance of terms.
+  Check the official repository for current access requirements.
+</Warning>
+
+### Automated Download
+
+```python download_mmfood.py
+import os
+import requests
+from pathlib import Path
+from tqdm import tqdm
+import zipfile
+
+class MMFoodDownloader:
+    def __init__(self, output_dir="data/mm-food-100k"):
+        self.output_dir = Path(output_dir)
+        self.base_url = "https://example.com/mm-food-100k/"  # Update with actual URL
+        self.splits = ['train', 'val', 'test']
+    
+    def download_file(self, url, destination):
+        """Download file with progress bar"""
+        response = requests.get(url, stream=True)
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(destination, 'wb') as f, tqdm(
+            desc=destination.name,
+            total=total_size,
+            unit='B',
+            unit_scale=True
+        ) as pbar:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+                pbar.update(len(chunk))
+    
+    def download_split(self, split):
+        """Download specific dataset split"""
+        print(f"Downloading {split} split...")
+        
+        zip_url = f"{self.base_url}{split}_images.zip"
+        zip_path = self.output_dir / f"{split}_images.zip"
+        
+        self.download_file(zip_url, zip_path)
+        
+        # Extract
+        print(f"Extracting {split}...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(self.output_dir / "images" / split)
+        
+        # Remove zip
+        zip_path.unlink()
+        
+    def download_annotations(self):
+        """Download annotation files"""
+        print("Downloading annotations...")
+        
+        for split in self.splits:
+            anno_url = f"{self.base_url}annotations/{split}_annotations.json"
+            anno_path = self.output_dir / "annotations" / f"{split}_annotations.json"
+            anno_path.parent.mkdir(parents=True, exist_ok=True)
+            self.download_file(anno_url, anno_path)
+    
+    def download_all(self):
+        """Download complete dataset"""
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        for split in self.splits:
+            self.download_split(split)
+        
+        self.download_annotations()
+        print("Download complete!")
+
+if __name__ == "__main__":
+    downloader = MMFoodDownloader()
+    downloader.download_all()
+```
+
+## Dataset Verification
+
+```python verify_dataset.py
+import json
+from pathlib import Path
+from PIL import Image
+import pandas as pd
+
+class DatasetVerifier:
+    def __init__(self, data_dir="data/mm-food-100k"):
+        self.data_dir = Path(data_dir)
+        self.splits = ['train', 'val', 'test']
+        
+    def verify_images(self):
+        """Check image integrity"""
+        corrupted = []
+        
+        for split in self.splits:
+            image_dir = self.data_dir / "images" / split
+            
+            for img_path in image_dir.rglob("*.jpg"):
+                try:
+                    img = Image.open(img_path)
+                    img.verify()
+                except Exception as e:
+                    corrupted.append((img_path, str(e)))
+        
+        if corrupted:
+            print(f"Found {len(corrupted)} corrupted images")
+            return False
+        else:
+            print("All images verified successfully")
+            return True
+    
+    def verify_annotations(self):
+        """Check annotation completeness"""
+        for split in self.splits:
+            anno_path = self.data_dir / "annotations" / f"{split}_annotations.json"
+            
+            with open(anno_path) as f:
+                annotations = json.load(f)
+            
+            # Check required fields
+            required_fields = ['image_id', 'food_name', 'category', 'nutrients']
+            for anno in annotations:
+                for field in required_fields:
+                    if field not in anno:
+                        print(f"Missing field '{field}' in {split} annotations")
+                        return False
+        
+        print("All annotations verified successfully")
+        return True
+    
+    def print_statistics(self):
+        """Display dataset statistics"""
+        stats = {}
+        
+        for split in self.splits:
+            anno_path = self.data_dir / "annotations" / f"{split}_annotations.json"
+            with open(anno_path) as f:
+                annotations = json.load(f)
+            
+            stats[split] = {
+                'num_images': len(annotations),
+                'categories': len(set(a['category'] for a in annotations))
+            }
+        
+        df = pd.DataFrame(stats).T
+        print("\n=== Dataset Statistics ===")
+        print(df)
+
+if __name__ == "__main__":
+    verifier = DatasetVerifier()
+    verifier.verify_images()
+    verifier.verify_annotations()
+    verifier.print_statistics()
+```
+
+## Data Preprocessing
+
+### Image Preprocessing Pipeline
+
+```python preprocessing.py
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from PIL import Image
+import json
+
+class MMFoodDataset(Dataset):
+    def __init__(self, data_dir, split='train', transform=None):
+        self.data_dir = Path(data_dir)
+        self.split = split
+        
+        # Load annotations
+        anno_path = self.data_dir / "annotations" / f"{split}_annotations.json"
+        with open(anno_path) as f:
+            self.annotations = json.load(f)
+        
+        # Default transforms
+        if transform is None:
+            self.transform = self.get_default_transforms(split)
+        else:
+            self.transform = transform
+        
+        # Load class mapping
+        self.classes = sorted(set(a['category'] for a in self.annotations))
+        self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
+    
+    def get_default_transforms(self, split):
+        """Define default augmentation pipeline"""
+        if split == 'train':
+            return transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomRotation(15),
+                transforms.ColorJitter(
+                    brightness=0.2,
+                    contrast=0.2,
+                    saturation=0.2,
+                    hue=0.1
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]
+                )
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]
+                )
+            ])
+    
+    def __len__(self):
+        return len(self.annotations)
+    
+    def __getitem__(self, idx):
+        anno = self.annotations[idx]
+        
+        # Load image
+        img_path = self.data_dir / "images" / self.split / anno['category'] / anno['image_id']
+        image = Image.open(img_path).convert('RGB')
+        
+        if self.transform:
+            image = self.transform(image)
+        
+        # Extract labels
+        category_idx = self.class_to_idx[anno['category']]
+        
+        # Nutrient targets
+        nutrients = torch.tensor([
+            anno['nutrients']['calories'],
+            anno['nutrients']['protein'],
+            anno['nutrients']['carbs'],
+            anno['nutrients']['fat']
+        ], dtype=torch.float32)
+        
+        # Portion size
+        portion = torch.tensor(anno.get('portion_grams', 100.0), dtype=torch.float32)
+        
+        return {
+            'image': image,
+            'category': category_idx,
+            'nutrients': nutrients,
+            'portion': portion,
+            'food_name': anno['food_name']
+        }
+
+# Create data loaders
+def create_data_loaders(data_dir, batch_size=32, num_workers=4):
+    datasets = {
+        split: MMFoodDataset(data_dir, split=split)
+        for split in ['train', 'val', 'test']
+    }
+    
+    loaders = {
+        'train': DataLoader(
+            datasets['train'],
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=True
+        ),
+        'val': DataLoader(
+            datasets['val'],
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=True
+        ),
+        'test': DataLoader(
+            datasets['test'],
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers
+        )
+    }
+    
+    return loaders
+```
+
+## Nutritional Database Integration
+
+### USDA FoodData Central
+
+```python nutrition_db.py
+import pandas as pd
+import requests
+
+class NutritionDatabase:
+    def __init__(self):
+        self.api_key = os.getenv('USDA_API_KEY')
+        self.base_url = "https://api.nal.usda.gov/fdc/v1/"
+        self.cache = {}
+    
+    def search_food(self, query):
+        """Search USDA FoodData Central"""
+        endpoint = f"{self.base_url}foods/search"
+        params = {
+            'query': query,
+            'api_key': self.api_key
+        }
+        
+        response = requests.get(endpoint, params=params)
+        return response.json()
+    
+    def get_nutrients(self, fdc_id):
+        """Get nutrient details for a food"""
+        if fdc_id in self.cache:
+            return self.cache[fdc_id]
+        
+        endpoint = f"{self.base_url}food/{fdc_id}"
+        params = {'api_key': self.api_key}
+        
+        response = requests.get(endpoint, params=params)
+        data = response.json()
+        
+        # Extract key nutrients
+        nutrients = {}
+        for nutrient in data.get('foodNutrients', []):
+            name = nutrient['nutrient']['name']
+            value = nutrient.get('amount', 0)
+            unit = nutrient.get('unitName', '')
+            
+            if 'Energy' in name:
+                nutrients['calories'] = value
+            elif 'Protein' in name:
+                nutrients['protein'] = value
+            elif 'Carbohydrate' in name:
+                nutrients['carbs'] = value
+            elif 'Total lipid' in name:
+                nutrients['fat'] = value
+            elif 'Fiber' in name:
+                nutrients['fiber'] = value
+            elif 'Sugars' in name:
+                nutrients['sugar'] = value
+        
+        self.cache[fdc_id] = nutrients
+        return nutrients
+
+# Map food categories to USDA database
+def create_nutrition_mapping(dataset_dir):
+    """Create mapping between dataset foods and USDA database"""
+    nutrition_db = NutritionDatabase()
+    
+    # Load dataset categories
+    with open(dataset_dir / "metadata.json") as f:
+        metadata = json.load(f)
+    
+    mapping = {}
+    for category in metadata['categories']:
+        # Search USDA database
+        results = nutrition_db.search_food(category['name'])
+        
+        if results['foods']:
+            fdc_id = results['foods'][0]['fdcId']
+            nutrients = nutrition_db.get_nutrients(fdc_id)
+            
+            mapping[category['name']] = {
+                'fdc_id': fdc_id,
+                'nutrients': nutrients
+            }
+    
+    # Save mapping
+    with open(dataset_dir / "nutrition" / "food_nutrient_mapping.json", 'w') as f:
+        json.dump(mapping, f, indent=2)
+    
+    return mapping
+```
+
+## Data Augmentation for Training
+
+### Advanced Augmentation Techniques
+
+```python advanced_augmentation.py
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
+def get_advanced_transforms(split='train'):
+    """Advanced augmentation pipeline using Albumentations"""
+    
+    if split == 'train':
+        return A.Compose([
+            A.RandomResizedCrop(224, 224, scale=(0.8, 1.0)),
+            A.HorizontalFlip(p=0.5),
+            A.ShiftScaleRotate(
+                shift_limit=0.1,
+                scale_limit=0.2,
+                rotate_limit=15,
+                p=0.5
+            ),
+            A.OneOf([
+                A.MotionBlur(p=0.2),
+                A.MedianBlur(blur_limit=3, p=0.1),
+                A.Blur(blur_limit=3, p=0.1),
+            ], p=0.3),
+            A.OneOf([
+                A.OpticalDistortion(p=0.3),
+                A.GridDistortion(p=0.1),
+            ], p=0.2),
+            A.OneOf([
+                A.CLAHE(clip_limit=2),
+                A.Sharpen(),
+                A.Emboss(),
+            ], p=0.3),
+            A.HueSaturationValue(p=0.3),
+            A.RandomBrightnessContrast(p=0.3),
+            A.Cutout(num_holes=8, max_h_size=16, max_w_size=16, p=0.5),
+            A.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
+            ToTensorV2()
+        ])
+    else:
+        return A.Compose([
+            A.Resize(256, 256),
+            A.CenterCrop(224, 224),
+            A.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
+            ToTensorV2()
+        ])
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Food Detection Model" icon="camera" href="/cv/food-detection">
+    Build and train the Vision Transformer
+  </Card>
+  <Card title="Nutrient Estimation" icon="flask" href="/cv/nutrient-estimation">
+    Multi-task learning for nutrient prediction
+  </Card>
+  <Card title="MIMIC-IV Setup" icon="database" href="/data/mimic-iv-setup">
+    Set up clinical risk modeling data
+  </Card>
+  <Card title="Feature Engineering" icon="gears" href="/data/feature-engineering">
+    Advanced feature extraction
+  </Card>
+</CardGroup>

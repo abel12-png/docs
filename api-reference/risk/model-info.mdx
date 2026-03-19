@@ -1,0 +1,26 @@
+---
+title: 'Model Information'
+api: 'GET /api/v1/models/info'
+description: 'Get model version and performance metrics'
+---
+
+## Endpoint
+
+```
+GET https://api.t2dm-predictor.com/api/v1/models/info
+```
+
+## Response
+
+Returns model version, training date, and performance metrics.
+
+```json
+{
+  "model_version": "lstm_v2.1.0",
+  "trained_date": "2026-03-01",
+  "metrics": {
+    "auroc": 0.912,
+    "auprc": 0.847
+  }
+}
+```

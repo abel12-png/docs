@@ -1,0 +1,28 @@
+---
+title: 'Food Detection with Vision Transformers'
+description: 'State-of-the-art food classification using ViT'
+---
+
+## Vision Transformer Architecture
+
+Using ViT-B/16 for food image classification:
+
+- Transfer learning from ImageNet-21k
+- Fine-tuning on MM-Food-100K
+- Multi-task learning (classification + portion + nutrients)
+
+## Training Pipeline
+
+```python
+# Example training code
+from transformers import ViTForImageClassification
+
+model = ViTForImageClassification.from_pretrained(
+    "google/vit-base-patch16-224",
+    num_labels=101
+)
+```
+
+<Note>
+  See [MM-Food Setup](/data/mm-food-setup) for dataset preparation.
+</Note>

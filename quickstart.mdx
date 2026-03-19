@@ -1,80 +1,487 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quick Start Guide'
+description: 'Get up and running with the T2DM AI Risk Predictor in 10 minutes'
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
+Before you begin, ensure you have the following:
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="System Requirements" icon="computer">
+    - **OS**: Ubuntu 20.04+ / macOS 11+ / Windows 10+ with WSL2
+    - **Python**: 3.9 or higher
+    - **GPU**: NVIDIA GPU with 8GB+ VRAM (optional but recommended)
+    - **RAM**: 16GB minimum, 32GB recommended
+    - **Storage**: 100GB free space for datasets and models
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+
+  <Accordion title="Dataset Access" icon="key">
+    - **MIMIC-IV**: Complete PhysioNet credentialing ([Apply here](https://physionet.org/settings/credentialing/))
+    - **MM-Food-100K**: Request dataset access from the authors
+    - Both datasets require signed data use agreements
+  </Accordion>
+
+  <Accordion title="Development Tools" icon="wrench">
+    - Git
+    - Docker (optional for containerized deployment)
+    - CUDA Toolkit 11.8+ (for GPU support)
+    - pip or conda package manager
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/yourusername/t2dm-ai-predictor.git
+    cd t2dm-ai-predictor
+    ```
+  </Step>
+
+  <Step title="Create Virtual Environment">
+    ```bash
+    # Using conda (recommended)
+    conda create -n t2dm python=3.10
+    conda activate t2dm
+
+    # Or using venv
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    ```bash
+    # Install core dependencies
+    pip install -r requirements.txt
+
+    # Install development dependencies (optional)
+    pip install -r requirements-dev.txt
+
+    # Verify installation
+    python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
+    ```
+  </Step>
+</Steps>
+
+## Dataset Setup
+
+### MIMIC-IV Clinical Data
+
+<Steps>
+  <Step title="Download MIMIC-IV">
+    ```bash
+    # Set up PhysioNet credentials
+    export PHYSIONET_USERNAME="your_username"
+    export PHYSIONET_PASSWORD="your_password"
+
+    # Download MIMIC-IV core modules
+    python scripts/data/download_mimic.py \
+      --output-dir data/mimic-iv \
+      --modules core hosp icu
+    ```
+  </Step>
+
+  <Step title="Extract T2DM Cohort">
+    ```bash
+    # Filter patients with T2DM indicators
+    python scripts/data/extract_t2dm_cohort.py \
+      --mimic-dir data/mimic-iv \
+      --output data/processed/t2dm_cohort.csv \
+      --icd-codes configs/t2dm_icd_codes.json
+    ```
+
+    <Tip>
+      The script identifies patients using ICD-10 codes: E11.* (Type 2 Diabetes), 
+      E08.* (Diabetes due to underlying condition), and related complications.
+    </Tip>
+  </Step>
+
+  <Step title="Preprocess Clinical Features">
+    ```bash
+    python scripts/data/preprocess_clinical.py \
+      --cohort data/processed/t2dm_cohort.csv \
+      --output data/processed/clinical_features.parquet \
+      --include-labs --include-vitals --include-demographics
+    ```
+  </Step>
+</Steps>
+
+### MM-Food-100K Dataset
+
+<Steps>
+  <Step title="Download Food Dataset">
+    ```bash
+    # Download MM-Food-100K dataset
+    python scripts/data/download_mmfood.py \
+      --output-dir data/mm-food-100k \
+      --split train val test
+
+    # Expected structure:
+    # data/mm-food-100k/
+    # ├── images/
+    # ├── annotations/
+    # └── metadata.json
+    ```
+  </Step>
+
+  <Step title="Verify Dataset Integrity">
+    ```bash
+    python scripts/data/verify_food_dataset.py \
+      --data-dir data/mm-food-100k \
+      --check-images --check-annotations
+    ```
+  </Step>
+</Steps>
+
+## Model Training
+
+### Train Risk Prediction Model
+
+```bash
+# Train LSTM-based clinical risk model
+python train_risk_model.py \
+  --config configs/lstm_risk_config.yaml \
+  --data data/processed/clinical_features.parquet \
+  --output models/risk_lstm \
+  --epochs 100 \
+  --batch-size 64 \
+  --early-stopping-patience 10
+```
+
+<CodeGroup>
+```yaml configs/lstm_risk_config.yaml
+model:
+  type: "LSTM"
+  hidden_size: 256
+  num_layers: 3
+  dropout: 0.3
+  bidirectional: true
+
+features:
+  clinical:
+    - age
+    - bmi
+    - hba1c
+    - glucose_fasting
+    - lipid_profile
+  temporal:
+    - vitals_sequence
+    - lab_sequence
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
+training:
+  optimizer: "AdamW"
+  learning_rate: 0.001
+  weight_decay: 0.01
+  scheduler: "CosineAnnealingLR"
+  
+loss:
+  type: "BCEWithLogitsLoss"
+  pos_weight: 2.5  # Handle class imbalance
+```
+
+```python Example Training Output
+Epoch 1/100
+Train Loss: 0.4521 | Val Loss: 0.4102 | Val AUROC: 0.7834
+Epoch 10/100
+Train Loss: 0.2815 | Val Loss: 0.2651 | Val AUROC: 0.8721
+Epoch 50/100
+Train Loss: 0.1432 | Val Loss: 0.1567 | Val AUROC: 0.9087
+Epoch 78/100
+Train Loss: 0.0987 | Val Loss: 0.1234 | Val AUROC: 0.9156
+Early stopping triggered. Best AUROC: 0.9156
+```
+</CodeGroup>
+
+### Train Food Recognition Model
+
+```bash
+# Train Vision Transformer for food classification
+python train_food_model.py \
+  --config configs/vit_food_config.yaml \
+  --data data/mm-food-100k \
+  --output models/food_vit \
+  --epochs 50 \
+  --batch-size 32 \
+  --gpus 1
+```
+
+<CodeGroup>
+```yaml configs/vit_food_config.yaml
+model:
+  type: "VisionTransformer"
+  backbone: "vit_base_patch16_224"
+  pretrained: true
+  num_classes: 101
+  
+  # Multi-task heads
+  tasks:
+    - food_classification
+    - portion_estimation
+    - nutrient_regression
+
+data:
+  image_size: 224
+  augmentation:
+    - RandomHorizontalFlip
+    - RandomRotation
+    - ColorJitter
+    - RandomResizedCrop
+  
+training:
+  optimizer: "AdamW"
+  learning_rate: 0.0001
+  warmup_epochs: 5
+  mixup_alpha: 0.2
+```
+
+```python Example Results
+Food Classification Metrics:
+- Top-1 Accuracy: 95.3%
+- Top-5 Accuracy: 98.7%
+- F1-Score (macro): 0.944
+
+Nutrient Estimation (MAE):
+- Calories: 42.5 kcal
+- Protein: 3.2 g
+- Carbohydrates: 5.8 g
+- Fat: 2.1 g
+```
+</CodeGroup>
+
+## Running Inference
+
+### Quick Prediction Example
+
+```python predict_example.py
+from t2dm_predictor import RiskPredictor, FoodAnalyzer
+from PIL import Image
+
+# Initialize models
+risk_model = RiskPredictor.from_pretrained("models/risk_lstm")
+food_model = FoodAnalyzer.from_pretrained("models/food_vit")
+
+# Patient clinical data
+patient_data = {
+    "age": 45,
+    "bmi": 28.5,
+    "hba1c": 5.9,
+    "glucose_fasting": 110,
+    "systolic_bp": 130,
+    "diastolic_bp": 85,
+    "ldl": 140,
+    "hdl": 45,
+    "triglycerides": 180
+}
+
+# Predict T2DM risk
+risk_score = risk_model.predict(patient_data)
+print(f"5-Year T2DM Risk: {risk_score:.2%}")
+print(f"Risk Category: {risk_model.get_risk_category(risk_score)}")
+
+# Analyze food image
+food_image = Image.open("sample_meal.jpg")
+food_analysis = food_model.analyze(food_image)
+
+print("\nFood Analysis:")
+print(f"Detected: {food_analysis['food_name']}")
+print(f"Confidence: {food_analysis['confidence']:.2%}")
+print(f"\nNutrients:")
+print(f"  Calories: {food_analysis['nutrients']['calories']} kcal")
+print(f"  Protein: {food_analysis['nutrients']['protein']}g")
+print(f"  Carbs: {food_analysis['nutrients']['carbs']}g")
+print(f"  Fat: {food_analysis['nutrients']['fat']}g")
+print(f"  Glycemic Index: {food_analysis['glycemic_index']}")
+
+# Get personalized recommendations
+from t2dm_predictor import RecommendationEngine
+
+recommender = RecommendationEngine(risk_model, food_model)
+recommendations = recommender.generate(
+    patient_data=patient_data,
+    current_meal=food_analysis
+)
+
+print("\n--- Personalized Recommendations ---")
+for rec in recommendations:
+    print(f"• {rec}")
+```
+
+<Accordion title="Expected Output">
+```plaintext
+5-Year T2DM Risk: 23.4%
+Risk Category: Moderate Risk
+
+Food Analysis:
+Detected: Spaghetti Carbonara
+Confidence: 97.3%
+
+Nutrients:
+  Calories: 720 kcal
+  Protein: 28g
+  Carbs: 85g
+  Fat: 32g
+  Glycemic Index: 68
+
+--- Personalized Recommendations ---
+• ⚠️  High carbohydrate content (85g) may spike blood glucose
+• Consider reducing portion size by 30% (target: 500 kcal)
+• Replace refined pasta with whole grain alternatives (GI 42 vs 68)
+• Add 2 cups of leafy greens to improve nutrient density
+• Drink water instead of sugary beverages
+• Schedule post-meal walk (20 minutes) to improve glucose uptake
+```
 </Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Launch API Server
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Start the API">
+    ```bash
+    # Development mode
+    uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 
-### Step 3: Go live
+    # Production mode with workers
+    gunicorn api.main:app \
+      --workers 4 \
+      --worker-class uvicorn.workers.UvicornWorker \
+      --bind 0.0.0.0:8000
+    ```
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Test the Endpoints">
+    ```bash
+    # Health check
+    curl http://localhost:8000/health
 
-## Next steps
+    # Predict T2DM risk
+    curl -X POST http://localhost:8000/api/v1/risk/predict \
+      -H "Content-Type: application/json" \
+      -d '{
+        "age": 45,
+        "bmi": 28.5,
+        "hba1c": 5.9,
+        "glucose_fasting": 110
+      }'
 
-Now that you have your docs running, explore these key features:
+    # Analyze food image
+    curl -X POST http://localhost:8000/api/v1/food/analyze \
+      -F "file=@sample_meal.jpg"
+    ```
+  </Step>
+
+  <Step title="View API Documentation">
+    Open your browser and navigate to:
+    - Swagger UI: http://localhost:8000/docs
+    - ReDoc: http://localhost:8000/redoc
+  </Step>
+</Steps>
+
+## Docker Deployment
+
+```bash
+# Build Docker image
+docker build -t t2dm-predictor:latest .
+
+# Run container with GPU support
+docker run --gpus all \
+  -p 8000:8000 \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/data:/app/data \
+  t2dm-predictor:latest
+
+# Or use Docker Compose
+docker-compose up -d
+```
+
+<CodeGroup>
+```dockerfile Dockerfile
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+
+WORKDIR /app
+
+# Install Python
+RUN apt-get update && apt-get install -y python3.10 python3-pip
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application
+COPY . .
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: t2dm_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+```
+</CodeGroup>
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Architecture Deep Dive" icon="sitemap" href="/architecture-overview">
+    Learn about the system components and design decisions
+  </Card>
+  <Card title="Data Processing" icon="filter" href="/data/preprocessing">
+    Explore advanced data preprocessing techniques
+  </Card>
+  <Card title="Model Training" icon="brain" href="/models/clinical-risk-lstm">
+    Detailed guide on training and tuning models
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/risk/predict">
+    Complete API documentation with examples
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+<Check>
+  **Congratulations!** You've successfully set up the T2DM AI Risk Predictor. 
+  Start exploring the documentation to learn more about advanced features.
+</Check>

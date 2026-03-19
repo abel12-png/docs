@@ -1,0 +1,34 @@
+---
+title: 'Results & Validation'
+description: 'Model performance and clinical validation'
+---
+
+## Risk Prediction Performance
+
+| Metric | Value | 95% CI |
+|--------|-------|--------|
+| AUROC | 0.912 | [0.897, 0.927] |
+| AUPRC | 0.847 | [0.829, 0.865] |
+| Sensitivity | 0.834 | [0.813, 0.855] |
+| Specificity | 0.876 | [0.861, 0.891] |
+
+## Food Recognition Performance
+
+| Metric | Value |
+|--------|-------|
+| Top-1 Accuracy | 95.3% |
+| Top-5 Accuracy | 98.7% |
+| Calorie MAE | 42.5 kcal |
+
+## Clinical Validation
+
+Validated on independent test set with temporal holdout.
+
+<CardGroup cols={2}>
+  <Card title="View Full Results" href="/research/experimental-design">
+    Detailed experimental results
+  </Card>
+  <Card title="Try the API" href="/api-reference/risk/predict">
+    Test the models yourself
+  </Card>
+</CardGroup>

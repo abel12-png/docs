@@ -1,0 +1,429 @@
+---
+title: 'Analyze Food Image'
+api: 'POST /api/v1/food/analyze'
+description: 'Detect food items and estimate nutritional content from images'
+---
+
+## Endpoint
+
+```
+POST https://api.t2dm-predictor.com/api/v1/food/analyze
+```
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Request Body
+
+This endpoint accepts `multipart/form-data` for image upload.
+
+<ParamField body="file" type="file" required>
+  Food image file (JPEG, PNG, WEBP)
+  - Max size: 10 MB
+  - Recommended: High resolution, well-lit images
+  - Supported formats: .jpg, .jpeg, .png, .webp
+</ParamField>
+
+<ParamField body="portion_reference" type="string">
+  Optional reference object for portion estimation
+  - "hand" - Use hand as reference
+  - "plate" - Standard dinner plate
+  - "coin" - Standard coin for scale
+</ParamField>
+
+<ParamField body="return_alternatives" type="boolean">
+  Return top-5 predictions (default: false)
+</ParamField>
+
+## Request Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.t2dm-predictor.com/api/v1/food/analyze \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -F "file=@meal_photo.jpg" \
+  -F "portion_reference=plate" \
+  -F "return_alternatives=true"
+```
+
+```python Python
+import requests
+
+url = "https://api.t2dm-predictor.com/api/v1/food/analyze"
+
+headers = {
+    "Authorization": "Bearer YOUR_API_TOKEN"
+}
+
+files = {
+    'file': open('meal_photo.jpg', 'rb')
+}
+
+data = {
+    'portion_reference': 'plate',
+    'return_alternatives': True
+}
+
+response = requests.post(url, headers=headers, files=files, data=data)
+result = response.json()
+
+print(f"Detected: {result['food_name']}")
+print(f"Confidence: {result['confidence']:.1%}")
+print(f"Calories: {result['nutrients']['calories']} kcal")
+```
+
+```javascript JavaScript
+const FormData = require('form-data');
+const fs = require('fs');
+const axios = require('axios');
+
+const form = new FormData();
+form.append('file', fs.createReadStream('meal_photo.jpg'));
+form.append('portion_reference', 'plate');
+form.append('return_alternatives', 'true');
+
+axios.post('https://api.t2dm-predictor.com/api/v1/food/analyze', form, {
+  headers: {
+    ...form.getHeaders(),
+    'Authorization': 'Bearer YOUR_API_TOKEN'
+  }
+})
+.then(response => {
+  console.log(`Detected: ${response.data.food_name}`);
+  console.log(`Confidence: ${(response.data.confidence * 100).toFixed(1)}%`);
+  console.log(`Calories: ${response.data.nutrients.calories} kcal`);
+})
+.catch(error => console.error(error));
+```
+
+```r R
+library(httr)
+
+url <- "https://api.t2dm-predictor.com/api/v1/food/analyze"
+
+response <- POST(
+  url,
+  body = list(
+    file = upload_file("meal_photo.jpg"),
+    portion_reference = "plate",
+    return_alternatives = "true"
+  ),
+  add_headers(Authorization = "Bearer YOUR_API_TOKEN")
+)
+
+result <- content(response)
+cat(sprintf("Detected: %s\n", result$food_name))
+cat(sprintf("Confidence: %.1f%%\n", result$confidence * 100))
+cat(sprintf("Calories: %d kcal\n", result$nutrients$calories))
+```
+</CodeGroup>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the analysis was successful
+</ResponseField>
+
+<ResponseField name="food_name" type="string">
+  Detected food item name
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Food category classification
+</ResponseField>
+
+<ResponseField name="confidence" type="float">
+  Model confidence score (0.0-1.0)
+</ResponseField>
+
+<ResponseField name="portion_size" type="object">
+  Estimated portion information
+  <Expandable title="properties">
+    <ResponseField name="grams" type="float">
+      Estimated weight in grams
+    </ResponseField>
+    <ResponseField name="volume_ml" type="float">
+      Estimated volume in milliliters (for liquids)
+    </ResponseField>
+    <ResponseField name="servings" type="float">
+      Number of standard servings
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Human-readable portion description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="nutrients" type="object">
+  Estimated nutritional content per detected portion
+  <Expandable title="properties">
+    <ResponseField name="calories" type="float">
+      Energy (kcal)
+    </ResponseField>
+    <ResponseField name="protein" type="float">
+      Protein (grams)
+    </ResponseField>
+    <ResponseField name="carbs" type="float">
+      Total carbohydrates (grams)
+    </ResponseField>
+    <ResponseField name="fat" type="float">
+      Total fat (grams)
+    </ResponseField>
+    <ResponseField name="fiber" type="float">
+      Dietary fiber (grams)
+    </ResponseField>
+    <ResponseField name="sugar" type="float">
+      Total sugars (grams)
+    </ResponseField>
+    <ResponseField name="sodium" type="float">
+      Sodium (milligrams)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="glycemic_index" type="integer">
+  Estimated glycemic index (0-100)
+</ResponseField>
+
+<ResponseField name="glycemic_load" type="float">
+  Estimated glycemic load
+</ResponseField>
+
+<ResponseField name="health_score" type="object">
+  Nutritional quality assessment
+  <Expandable title="properties">
+    <ResponseField name="overall_score" type="integer">
+      Overall health score (0-100)
+    </ResponseField>
+    <ResponseField name="diabetes_friendly" type="boolean">
+      Suitable for T2DM risk reduction
+    </ResponseField>
+    <ResponseField name="warnings" type="array">
+      List of nutritional warnings
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="alternatives" type="array">
+  Top-5 alternative predictions (if requested)
+  <Expandable title="structure">
+    <ResponseField name="food_name" type="string">
+      Alternative food name
+    </ResponseField>
+    <ResponseField name="confidence" type="float">
+      Confidence score for this alternative
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of analysis
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "success": true,
+  "food_name": "Spaghetti Carbonara",
+  "category": "Italian Pasta",
+  "confidence": 0.973,
+  "portion_size": {
+    "grams": 350,
+    "volume_ml": null,
+    "servings": 1.4,
+    "description": "Large serving, approximately 1.5 cups"
+  },
+  "nutrients": {
+    "calories": 720,
+    "protein": 28,
+    "carbs": 85,
+    "fat": 32,
+    "fiber": 4,
+    "sugar": 5,
+    "sodium": 890
+  },
+  "glycemic_index": 68,
+  "glycemic_load": 57.8,
+  "health_score": {
+    "overall_score": 45,
+    "diabetes_friendly": false,
+    "warnings": [
+      "High glycemic index may cause blood sugar spikes",
+      "Large portion size",
+      "High sodium content"
+    ]
+  },
+  "alternatives": [
+    {
+      "food_name": "Spaghetti Carbonara",
+      "confidence": 0.973
+    },
+    {
+      "food_name": "Fettuccine Alfredo",
+      "confidence": 0.015
+    },
+    {
+      "food_name": "Pasta Aglio e Olio",
+      "confidence": 0.007
+    },
+    {
+      "food_name": "Cacio e Pepe",
+      "confidence": 0.003
+    },
+    {
+      "food_name": "Pasta Primavera",
+      "confidence": 0.002
+    }
+  ],
+  "timestamp": "2026-03-19T14:45:22Z"
+}
+```
+
+## Glycemic Index Classification
+
+| GI Range | Classification | Diabetes Impact |
+|----------|----------------|-----------------|
+| 0-55 | Low GI | Minimal blood sugar impact |
+| 56-69 | Medium GI | Moderate blood sugar impact |
+| 70-100 | High GI | Significant blood sugar spike |
+
+## Health Score Interpretation
+
+| Score | Rating | Recommendation |
+|-------|--------|----------------|
+| 80-100 | Excellent | Highly recommended for diabetes prevention |
+| 60-79 | Good | Generally healthy, minor modifications suggested |
+| 40-59 | Fair | Moderate concerns, portion control advised |
+| 20-39 | Poor | High risk, consider healthier alternatives |
+| 0-19 | Very Poor | Avoid or significantly modify |
+
+## Supported Food Categories
+
+The model can detect 101 food categories including:
+
+<Accordion title="View all categories">
+- **Appetizers**: Spring rolls, Bruschetta, Chicken wings, etc.
+- **Main Courses**: Steak, Grilled chicken, Fish and chips, etc.
+- **Pasta**: Spaghetti, Lasagna, Fettuccine, etc.
+- **Asian Cuisine**: Sushi, Pad Thai, Fried rice, etc.
+- **Fast Food**: Pizza, Burgers, French fries, etc.
+- **Desserts**: Cheesecake, Ice cream, Brownies, etc.
+- **Beverages**: Smoothies, Milkshakes, Coffee, etc.
+- **Breakfast**: Pancakes, Waffles, Eggs Benedict, etc.
+- **Salads**: Caesar salad, Greek salad, etc.
+- **Soups**: Tomato soup, Chicken noodle, etc.
+
+*Full category list available in API documentation*
+</Accordion>
+
+## Best Practices for Image Quality
+
+<CardGroup cols={2}>
+  <Card title="Lighting" icon="lightbulb">
+    - Use natural or bright lighting
+    - Avoid harsh shadows
+    - No flash directly on food
+  </Card>
+  
+  <Card title="Angle & Distance" icon="camera">
+    - Top-down view preferred
+    - Fill 60-80% of frame
+    - 15-30 cm distance
+  </Card>
+  
+  <Card title="Background" icon="image">
+    - Plain, contrasting background
+    - Avoid clutter
+    - Use standard plate/bowl
+  </Card>
+  
+  <Card title="Focus & Resolution" icon="magnifying-glass">
+    - Sharp focus on food
+    - Minimum 640x640 pixels
+    - No excessive filters
+  </Card>
+</CardGroup>
+
+## Error Responses
+
+<CodeGroup>
+```json 400 - Invalid Image
+{
+  "error": {
+    "code": "INVALID_IMAGE",
+    "message": "Unable to process image",
+    "details": {
+      "reason": "Image file corrupted or unsupported format"
+    }
+  }
+}
+```
+
+```json 400 - No Food Detected
+{
+  "error": {
+    "code": "NO_FOOD_DETECTED",
+    "message": "No recognizable food items found in image",
+    "details": {
+      "confidence": 0.12,
+      "suggestion": "Ensure food is clearly visible and well-lit"
+    }
+  }
+}
+```
+
+```json 413 - File Too Large
+{
+  "error": {
+    "code": "FILE_TOO_LARGE",
+    "message": "Image file exceeds maximum size",
+    "details": {
+      "max_size_mb": 10,
+      "received_size_mb": 15.3
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Model Performance
+
+Food classification metrics on test set:
+
+| Metric | Value |
+|--------|-------|
+| Top-1 Accuracy | 95.3% |
+| Top-5 Accuracy | 98.7% |
+| F1-Score (macro) | 0.944 |
+| Calorie MAE | 42.5 kcal |
+| Portion MAE | 28.3 grams |
+
+## Rate Limits
+
+<Info>
+  **Image Analysis Rate Limits:**
+  - Free tier: 50 requests/day
+  - Professional: 500 requests/day
+  - Enterprise: Custom limits
+</Info>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Estimate Nutrients" icon="calculator" href="/api-reference/food/estimate-nutrients">
+    Get nutrients for specific food and portion
+  </Card>
+  <Card title="Food Database" icon="database" href="/api-reference/food/food-database">
+    Search comprehensive food database
+  </Card>
+  <Card title="Meal Recommendations" icon="utensils" href="/api-reference/recommendations/personalized-meals">
+    Get personalized meal suggestions
+  </Card>
+  <Card title="Risk Prediction" icon="heart-pulse" href="/api-reference/risk/predict">
+    Predict T2DM risk from clinical data
+  </Card>
+</CardGroup>

@@ -1,68 +1,119 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "T2DM AI Risk Predictor",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#3B82F6",
+    "light": "#60A5FA",
+    "dark": "#1E40AF"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
               "index",
               "quickstart",
-              "development"
+              "architecture-overview"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Data Pipeline",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "data/mimic-iv-setup",
+              "data/mm-food-setup",
+              "data/preprocessing",
+              "data/feature-engineering"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Risk Prediction Models",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "models/clinical-risk-lstm",
+              "models/tabular-deep-learning",
+              "models/feature-importance",
+              "models/model-interpretability"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Computer Vision",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "cv/food-detection",
+              "cv/nutrient-estimation",
+              "cv/vision-transformers",
+              "cv/multimodal-fusion"
+            ]
+          },
+          {
+            "group": "Personalized Recommendations",
+            "pages": [
+              "recommendations/nutrition-engine",
+              "recommendations/meal-planning",
+              "recommendations/risk-stratification",
+              "recommendations/adaptive-learning"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/setup",
+              "deployment/docker",
+              "deployment/api-gateway",
+              "deployment/monitoring"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Risk Prediction API",
             "pages": [
-              "api-reference/introduction"
+              "api-reference/risk/predict",
+              "api-reference/risk/batch-predict",
+              "api-reference/risk/model-info"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Food Analysis API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/food/analyze-image",
+              "api-reference/food/estimate-nutrients",
+              "api-reference/food/food-database"
+            ]
+          },
+          {
+            "group": "Recommendation API",
+            "pages": [
+              "api-reference/recommendations/personalized-meals",
+              "api-reference/recommendations/nutrition-plan",
+              "api-reference/recommendations/risk-alerts"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Research",
+        "groups": [
+          {
+            "group": "Background",
+            "pages": [
+              "research/diabetes-epidemiology",
+              "research/ml-healthcare",
+              "research/related-work"
+            ]
+          },
+          {
+            "group": "Methodology",
+            "pages": [
+              "research/experimental-design",
+              "research/evaluation-metrics",
+              "research/results"
             ]
           }
         ]
@@ -71,14 +122,19 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/yourusername/t2dm-ai-predictor",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "Dataset",
+          "href": "https://physionet.org/content/mimiciv/",
+          "icon": "database"
+        },
+        {
+          "anchor": "Paper",
+          "href": "#",
+          "icon": "file-lines"
         }
       ]
     }
@@ -90,14 +146,14 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "Contact",
+        "href": "mailto:research@example.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Try Demo",
+      "href": "https://demo.example.com"
     }
   },
   "contextual": {
@@ -114,9 +170,8 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/yourusername/t2dm-ai-predictor",
+      "linkedin": "https://linkedin.com/in/yourprofile"
     }
   }
 }

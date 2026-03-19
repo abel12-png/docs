@@ -1,0 +1,32 @@
+---
+title: 'Experimental Design'
+description: 'Methodology and study design'
+---
+
+## Study Design
+
+### Data Sources
+
+1. **MIMIC-IV**: Clinical risk modeling (N=50,048 patients)
+2. **MM-Food-100K**: Food recognition training (N=100,000 images)
+
+### Train/Validation/Test Split
+
+- Training: 70%
+- Validation: 15%
+- Test: 15%
+
+Stratified by diabetes status to preserve class distribution.
+
+### Model Training
+
+- **Risk Predictor**: Bidirectional LSTM
+- **Food Analyzer**: Vision Transformer (ViT-B/16)
+- **Recommendation Engine**: Hybrid rule-based + RL
+
+### Evaluation Metrics
+
+- AUROC, AUPRC
+- Sensitivity, Specificity
+- Calibration (ECE, Brier score)
+- Feature importance (SHAP)
